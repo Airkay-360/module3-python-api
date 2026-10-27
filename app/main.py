@@ -1,11 +1,22 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from app.models import Idea, IdeaRequest
 from app.store import IdeaStore
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Campus Idea Board")
+    
+    # Phase 2: Allow React frontend to call the API
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:5173"],
+        allow_credentials=True,
+        allow_methods=["GET", "POST"],
+        allow_headers=["*"],
+    )
+
     store = IdeaStore()  # Fresh store per app; test clients can be isolated.
 
     # FastAPI normally uses 422 for validation errors. We supply this handler
@@ -16,20 +27,18 @@ def create_app() -> FastAPI:
 
     @app.get("/api/hello")
     def hello():
-        # TODO 1: Personalize the message; keep the "message" key.
         return {"message": "Hello from the Campus Idea Board! Romain!"}
 
-    # TODO 2: Add the GET route decorator for /api/ideas.
     @app.get("/api/ideas")
     def get_ideas() -> list[Idea]:
-        # TODO 3: Return the store's read method result.
         return store.find_all()
 
-    # TODO 4: Add the POST route decorator for /api/ideas with status_code=201.
     @app.post("/api/ideas", status_code=201)
     def create_idea(request: IdeaRequest) -> Idea:
-        # The supplied type annotation tells FastAPI to read and validate JSON.
-        # TODO 5: Return the idea created by the store's add method.
+        # Phase 2: Reject empty or spaces-only titles with a 400 error
+        if not request.title or not request.title.strip():
+            raise HTTPException(status_code=400, detail="Title cannot be empty or spaces-only")
+            
         return store.add(request)
 
     return app
